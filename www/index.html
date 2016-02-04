@@ -1,0 +1,185 @@
+<html>
+
+<head>
+        <title>Absurd Blabber</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+        <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+        <style>
+                .cardSize {
+                        height: 300px;
+                        width: 200px;
+                        padding-left: 25%;
+                }
+        </style>
+</head>
+
+<body>
+        <div id="login">
+                <div class="jumbotron" style="background: white;">
+                        <h1 align="center">Absurd Blabber</h1>
+                </div>
+                <div class="well center-block" style="max-width: 270px;">
+                        <h2 align="center">Login</h2>
+
+                        <form id="usernameForm" role="form">
+                                <div class="form-group">
+                                        <input id="username" type="text" class="form-control" placeholder="Enter Unsername">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-lg btn-block">Submit</button>
+                        </form>
+                </div>
+        </div>
+        
+        <div id="game">
+                <div class="jumbotron" style="background: white;">
+                        <h1 align="center">Absurd Blabber</h1>
+                </div>
+                <div class="row">
+                        <div class="col-md-4" .col-md-4>
+				<div class="well well-sm">
+					<h1>Users</h1>
+					<div id="users"></div>
+                        	</div>
+				<div class="well well-sm">
+					<strong>Your Account</strong>
+					<div id="yourAccount"></div>
+				</div>
+			</div>
+                        <div class="col-md-4" .col-md-4>
+                                <div id="card" class="cardSize">
+                                        <div class="front alert alert-info" align="center">
+                                                <br><br><br><br><br><br><strong>Absurd Blabber</strong>
+                                        </div>
+                                        <div id="cardContent" class="back well well-lg" align="center">
+                                        </div>
+                                </div>
+                        </div>
+			<div class="col-md-4" .col-md-4>
+				<h2>Timer</h2>
+				<div id="timer"></div>
+			</div>
+                </div>
+		<div class="row">
+			<div class="col-md-4" .col-md-4></div>
+			<div class="col-md-8" .col-md-8>
+				<form class="form-inline" id="answerForm" style="width:100%">
+                                	<button type="submit" class="btn btn-primary">Blab It!</button>
+					<div class="form-group">
+                                        	<input id="answer" type="text" class="form-control" placeholder="Enter Guess">
+                                	</div>
+                        	</form>
+			
+			</div>
+		</div>
+        </div>
+
+        <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="https://cdn.rawgit.com/nnattawat/flip/v1.0.16/dist/jquery.flip.min.js"></script>
+        <script>
+                jQuery(function($){
+                var socket = io.connect();
+                var $usernameForm = $('#usernameForm');
+                var $username = $('#username');
+		var $users = $('#users');
+		var $yourAccount = $('#yourAccount');
+		var username;
+		var $userList = $('#userList');
+		var $timer = $('#timer');
+		var time = 0;
+		var $answer = $('#answer');
+		var $answerForm = $('#answerForm');
+		var $cardContent = $('#cardContent');
+		var canAnswer = false;
+		var wait = true;
+               
+                $('#game').hide();
+                $("#card").flip({
+			trigger: 'manual'
+		});   
+                $usernameForm.submit(function(e){
+                        e.preventDefault();
+                        socket.emit('new user', $username.val(), function(returnedBool){
+                                username =  $username.val();
+				if(returnedBool){
+                                        $('#login').hide();
+                                        $('#game').show();
+                                } else{
+                                        alert('Sorry, that username is either taken or too short! Please input another username.');   
+                                }                     
+                        });
+                });
+
+		socket.on('usernames', function(returnUsernames){
+			var html = '';
+			var scores = Object.keys(returnUsernames).map(function(k){return returnUsernames[k]});
+			var usernames = Object.keys(returnUsernames);
+			if (usernames.length >= 10){
+				for (i=0; i<10; i++){
+					var num = i;
+                                        num++;
+                                        html += num + '. ' + usernames[i] + ' ' + scores[i] + '<br/>'
+				}
+			} else{
+				for (i=0; i<usernames.length; i++){
+					var num = i;
+					num++;
+					html += num + '. ' + usernames[i]  + ' ' + scores[i] + '<br/>'
+				}	
+				for (i=0; i<10-usernames.length; i++){
+					html += '<br/>';
+				}
+			}
+			$users.html(html);
+			html = username + ' ' + returnUsernames[username];
+			$yourAccount.html(html);
+		});
+	
+		socket.on('timer', function(time){
+			$timer.html(time);
+		});
+
+		socket.on('wait', function(returnWait){
+			wait = returnWait;
+			if (!wait){
+				$("#card").flip(true);
+				canAnswer = true;
+			} else{
+				$("#card").flip(false);
+                                canAnswer = false;
+			}
+		});
+
+		
+		$answerForm.submit(function(e){
+                        e.preventDefault();	
+				if (wait){
+                                        alert("You can not answer at this time. Please try again when the card flips.");
+                                } else if(!canAnswer){
+                                        alert("You have already guessed the correct answer, and must wait for the next card. Please try again in a moment.");
+                                } else {
+					socket.emit('answer', $answer.val(), function(isCorrect){
+						if (isCorrect > 0){
+                                        		alert("That's Correct!!! You have been awarded " + isCorrect + " points.");
+                                        		canAnswer = false;
+						} else {
+                                        		alert("That is an incorrect guess!!! Please try again.");
+                                		}
+					});
+				}
+		});
+		
+		socket.on('card', function(card){
+			var html = '<br><br><br><br><br><br>';
+			html += card;
+			$cardContent.html(html);
+		});     
+        });
+        </script>
+</body>
+
+</html>
